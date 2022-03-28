@@ -5,6 +5,9 @@ import (
 	apiControllerV2 "GoGinProject/controllers/api/v2"
 	"GoGinProject/middlewares"
 	"github.com/gin-gonic/gin"
+	"log"
+	"net/http"
+	"time"
 )
 
 //SetupRouter function will perform all route operations
@@ -43,6 +46,34 @@ func SetupRouter() *gin.Engine {
 	{
 		v1.GET("test-user-list", apiControllerV1.TestUserList)
 		v1.POST("user-list", apiControllerV1.UserList)
+		r.GET("/user/:name/*action", func(c *gin.Context) {
+			name := c.Param("name")
+			action := c.Param("action")
+			message := name + " is " + action
+			c.String(http.StatusOK, message)
+		})
+		r.GET("/log", func(c *gin.Context) {
+			c.File("gin.log")
+		})
+		r.GET("/long_async", func(c *gin.Context) {
+			// create copy to be used inside the goroutine
+			cCp := c.Copy()
+			go func() {
+				// simulate a long task with time.Sleep(). 5 seconds
+				time.Sleep(5 * time.Second)
+
+				// note that you are using the copied context "cCp", IMPORTANT
+				log.Println("Done! in path " + cCp.Request.URL.Path)
+			}()
+		})
+
+		r.GET("/long_sync", func(c *gin.Context) {
+			// simulate a long task with time.Sleep(). 5 seconds
+			time.Sleep(5 * time.Second)
+
+			// since we are NOT using a goroutine, we do not have to copy the context
+			log.Println("Done! in path " + c.Request.URL.Path)
+		})
 	}
 
 	//API route for version 2

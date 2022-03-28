@@ -1,0 +1,27 @@
+[GIN-debug] [WARNING] Creating an Engine instance with the Logger and Recovery middleware already attached.
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] GET    /storage/*filepath        --> github.com/gin-gonic/gin.(*RouterGroup).createStaticHandler.func1 (3 handlers)
+[GIN-debug] HEAD   /storage/*filepath        --> github.com/gin-gonic/gin.(*RouterGroup).createStaticHandler.func1 (3 handlers)
+[GIN-debug] GET    /templates/*filepath      --> github.com/gin-gonic/gin.(*RouterGroup).createStaticHandler.func1 (3 handlers)
+[GIN-debug] HEAD   /templates/*filepath      --> github.com/gin-gonic/gin.(*RouterGroup).createStaticHandler.func1 (3 handlers)
+[GIN-debug] Loaded HTML Templates (2): 
+	- 
+	- demo.html
+
+[GIN-debug] GET    /api/v1/test-user-list    --> GoGinProject/controllers/api/v1.TestUserList (5 handlers)
+[GIN-debug] POST   /api/v1/user-list         --> GoGinProject/controllers/api/v1.UserList (5 handlers)
+[GIN-debug] GET    /user/:name/*action       --> GoGinProject/routers.SetupRouter.func2 (4 handlers)
+[GIN-debug] POST   /api/v2/user-list         --> GoGinProject/controllers/api/v2.UserList (4 handlers)
+[GIN-debug] [WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.
+Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.
+[GIN-debug] Listening and serving HTTP on :8099
+[GIN] 2022/03/28 - 13:09:44 | 200 |            0s |       127.0.0.1 | GET      "/user/test/create"
+[GIN] 2022/03/28 - 13:09:44 | 200 |            0s |       127.0.0.1 | GET      "/user/test/create"
+[GIN] 2022/03/28 - 13:09:45 | 200 |            0s |       127.0.0.1 | GET      "/user/test/create"
+[GIN] 2022/03/28 - 13:09:45 | 200 |            0s |       127.0.0.1 | GET      "/user/test/create"
+[GIN] 2022/03/28 - 13:09:46 | 200 |      1.0011ms |       127.0.0.1 | GET      "/user/test/create"
+[GIN] 2022/03/28 - 13:09:56 | 200 |            0s |       127.0.0.1 | GET      "/user/test/create"
