@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	e := godotenv.Load("../.env")
+	e := godotenv.Load()
 	if e != nil {
 		fmt.Print(e)
 	}
@@ -30,7 +30,7 @@ func main() {
 		fmt.Println("connected")
 	}
 	fixtures, err := testfixtures.NewFiles(conn, &testfixtures.MySQL{},
-		"fixtures/user.yml",
+		"seeder/fixtures/user.yml",
 	)
 	if err != nil {
 		log.Fatal(err)
