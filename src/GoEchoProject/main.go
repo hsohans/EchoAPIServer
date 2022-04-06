@@ -33,6 +33,5 @@ func main() {
 		Run()
 	}
 
-	r.Run(":" + port)
-
+	r.Logger.Fatal(r.Start(":8395"))
 }
