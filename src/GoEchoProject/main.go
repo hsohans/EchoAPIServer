@@ -1,20 +1,23 @@
 package main
 
 import (
+	Connections "GoEchoProject/connections"
 	Routers "GoEchoProject/routers"
 	"fmt"
-	"github.com/joho/godotenv"
 	"os"
 )
 
 //Execution starts from main function
 func main() {
 
-	e := godotenv.Load()
-	if e != nil {
-		fmt.Print(e)
+	// connection 설정 (DB & API etc..)
+	c, err := Connections.SetupConnection()
+	if err != nil {
+		fmt.Println(err)
 	}
-	r := Routers.SetupRouter()
+
+	// Router 설정
+	r := Routers.SetupRouter(c)
 
 	port := os.Getenv("port")
 
@@ -33,5 +36,5 @@ func main() {
 		Run()
 	}
 
-	r.Logger.Fatal(r.Start(":8395"))
+	r.Logger.Fatal(r.Start(":" + port))
 }

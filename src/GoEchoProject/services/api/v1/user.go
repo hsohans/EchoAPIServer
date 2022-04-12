@@ -1,26 +1,39 @@
 package v1service
 
 import (
-	u "GoEchoProject/apiHelpers"
 	"GoEchoProject/models"
-	res "GoEchoProject/resources/api/v1"
+	"fmt"
+	"github.com/jinzhu/gorm"
+	"github.com/labstack/echo/v4"
+
+	dao "GoEchoProject/dao/api/v1"
 )
 
-//UserService struct
+//Gorm Object Struct
 type UserService struct {
-	User models.User
+	txn *gorm.DB
 }
 
-//UserList function returns the list of users
-func (us *UserService) UserList() map[string]interface{} {
-	user := us.User
-
-	userData := res.UserResponse{
-		ID:    user.ID,
-		Name:  "test",
-		Email: "test@gmail.com",
+func GetUserService(txn *gorm.DB) *UserService {
+	return &UserService{
+		txn: txn,
 	}
-	response := u.Message(0, "This is from version 1 api")
-	response["data"] = userData
-	return response
+}
+
+func (h *UserService) GetUsers(apiRequest models.UserInfo, c echo.Context) ([]models.UserInfo, error) {
+	users, err := dao.GetUserDao(h.txn).GetUsers(apiRequest, c)
+	if err != nil {
+		fmt.Println(err.Error())
+		return users, err
+	}
+	return users, nil
+}
+
+func (h *UserService) GetUser(apiRequest models.UserInfo, c echo.Context) ([]models.UserInfo, error) {
+	users, err := dao.GetUserDao(h.txn).GetUser(apiRequest, c)
+	if err != nil {
+		fmt.Println(err.Error())
+		return users, err
+	}
+	return users, nil
 }

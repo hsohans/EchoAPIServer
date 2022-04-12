@@ -48,7 +48,7 @@ func init() {
 
 	//Automatically create migration as per model
 	db.Debug().AutoMigrate(
-		&User{},
+		&UserInfo{},
 	)
 }
 

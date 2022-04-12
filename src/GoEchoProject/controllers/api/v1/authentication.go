@@ -9,17 +9,17 @@ import (
 	"net/http"
 )
 
-type UserController struct {
+type AuthenticationController struct {
 	DbInfo *gorm.DB
 }
 
-func GetUserController(c connections.Connections) *UserController {
-	return &UserController{
+func GetAuthenticationController(c connections.Connections) *AuthenticationController {
+	return &AuthenticationController{
 		DbInfo: c.DbInfo,
 	}
 }
 
-func (a *UserController) GetUsers(c echo.Context) (err error) {
+func (a *AuthenticationController) CreateToken(c echo.Context) (err error) {
 	/* Request Body Data Mapping */
 	var apiRequest models.UserInfo // -> &추가
 	//apiRequest := new(models.UserInfo) // &제거
@@ -29,13 +29,13 @@ func (a *UserController) GetUsers(c echo.Context) (err error) {
 	}
 
 	// Authentication의 CreateToken을 호출한다.
-	users, err := v1service.GetUserService(a.DbInfo).GetUsers(apiRequest, c)
+	token, err := v1service.GetAuthenticationService(a.DbInfo).CreateToken(apiRequest, c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, err.Error())
 		return nil
 	}
 
 	// 토근을 발급한다.
-	c.JSON(http.StatusOK, users)
+	c.JSON(http.StatusOK, token)
 	return nil
 }
