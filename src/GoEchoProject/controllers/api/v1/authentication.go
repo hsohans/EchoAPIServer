@@ -4,38 +4,42 @@ import (
 	"GoEchoProject/connections"
 	"GoEchoProject/models"
 	v1service "GoEchoProject/services/api/v1"
+	"github.com/go-redis/redis/v7"
 	"github.com/jinzhu/gorm"
 	"github.com/labstack/echo/v4"
 	"net/http"
 )
 
 type AuthenticationController struct {
-	DbInfo *gorm.DB
+	DbInfo    *gorm.DB
+	RedisInfo *redis.Client
 }
 
-func GetAuthenticationController(c connections.Connections) *AuthenticationController {
+func GetAuthenticationController(conn connections.Connections) *AuthenticationController {
 	return &AuthenticationController{
-		DbInfo: c.DbInfo,
+		DbInfo:    conn.DbInfo,
+		RedisInfo: conn.RedisInfo,
 	}
 }
 
 func (a *AuthenticationController) CreateToken(c echo.Context) (err error) {
-	/* Request Body Data Mapping */
+
+	/* Request Body Data를 매핑한다.  */
 	var apiRequest models.UserInfo // -> &추가
-	//apiRequest := new(models.UserInfo) // &제거
 	if err = c.Bind(&apiRequest); err != nil {
-		c.JSON(http.StatusUnprocessableEntity, "Invalid json provided")
-		return nil
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid json provided")
 	}
 
 	// Authentication의 CreateToken을 호출한다.
-	token, err := v1service.GetAuthenticationService(a.DbInfo).CreateToken(apiRequest, c)
+	tokenDetails, err := v1service.GetAuthenticationService(a.DbInfo, a.RedisInfo).CreateToken(apiRequest, c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, err.Error())
-		return nil
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	// 토근을 발급한다.
-	c.JSON(http.StatusOK, token)
+	// TokenDetails로 토근을 발급한다. (AccessToken, RefreshToken, AccessUuid, RefreshUuid, AtExpires, RtExpires)
+	err = c.JSON(http.StatusOK, tokenDetails)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
 	return nil
 }
