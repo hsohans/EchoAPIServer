@@ -30,13 +30,14 @@ func (a *AuthenticationController) CreateToken(c echo.Context) (err error) {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid json provided")
 	}
 
-	// Authentication의 CreateToken을 호출한다.
+	// Authentication의 CreateToken 발급을 호출한다.
 	tokenDetails, err := v1service.GetAuthenticationService(a.DbInfo, a.RedisInfo).CreateToken(apiRequest, c)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	// TokenDetails로 토근을 발급한다. (AccessToken, RefreshToken, AccessUuid, RefreshUuid, AtExpires, RtExpires)
+	// TokenDetails로 토근 정보를 전달한다. (AccessToken, RefreshToken, AccessUuid, RefreshUuid, AtExpires, RtExpires)
+	// JSON 같은 경우 Unhandled error에 대한 처리를 필요로 한다.
 	err = c.JSON(http.StatusOK, tokenDetails)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
