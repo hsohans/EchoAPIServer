@@ -13,9 +13,9 @@ type UserController struct {
 	DbInfo *gorm.DB
 }
 
-func GetUserController(c connections.Connections) *UserController {
+func GetUserController(conn connections.Connections) *UserController {
 	return &UserController{
-		DbInfo: c.DbInfo,
+		DbInfo: conn.DbInfo,
 	}
 }
 

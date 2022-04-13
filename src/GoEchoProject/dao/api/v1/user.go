@@ -23,13 +23,13 @@ func (u *UserDao) GetUsers(apiRequest models.UserInfo, c echo.Context) (tz []mod
 	users := u.txn.Debug().Table("user_infos").
 		Select(" * ").
 		Find(&t)
-	fmt.Println(users)
+	//fmt.Println(users)
 
 	if users.Error != nil {
 		fmt.Println(users.Error)
 		return t, users.Error
 	}
-	c.Logger().Info(users)
+	//c.Logger().Info(users)
 
 	return t, err
 }
@@ -41,13 +41,13 @@ func (u *UserDao) GetUser(apiRequest models.UserInfo, c echo.Context) (tz []mode
 		Select(" * ").
 		Where("username = ? ", apiRequest.Username).
 		Find(&t)
-	fmt.Println(users)
+	//fmt.Println(users)
 
 	if users.Error != nil {
 		fmt.Println(users.Error)
 		return t, users.Error
 	}
-	c.Logger().Info(users)
+	//c.Logger().Info(users)
 
 	return t, err
 }

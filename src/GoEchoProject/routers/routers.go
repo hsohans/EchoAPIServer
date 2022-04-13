@@ -3,6 +3,7 @@ package routers
 import (
 	"GoEchoProject/connections"
 	apiControllerV1 "GoEchoProject/controllers/api/v1"
+	"GoEchoProject/middlewares"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	echoSwagger "github.com/swaggo/echo-swagger"
@@ -10,7 +11,7 @@ import (
 )
 
 //SetupRouter function will perform all route operations
-func SetupRouter(c connections.Connections) *echo.Echo {
+func SetupRouter(conn connections.Connections) *echo.Echo {
 	e := echo.New()
 
 	// Logger 설정 (HTTP requests)
@@ -31,17 +32,17 @@ func SetupRouter(c connections.Connections) *echo.Echo {
 	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	// Controller 설정
-	apiAuthentication := apiControllerV1.GetAuthenticationController(c)
-	apiUser := apiControllerV1.GetUserController(c)
+	apiAuthentication := apiControllerV1.GetAuthenticationController(conn)
+	apiUser := apiControllerV1.GetUserController(conn)
 
 	// Router 설정
-	v1 := e.Group("/api/v1")
-	v1.POST("/token", apiAuthentication.CreateToken)
+	//// Token은 항상 접근 가능하도록
+	e.POST("/api/v1/token", apiAuthentication.CreateToken)
+
+	//// 그외에 다른 정보는 발급된 토큰을 기반으로 유효한 토큰을 가진 사용자만 접근하도록 middleware 설정
+	//// 추가 설명 : middlewares.CheckToken 설정 (입력된 JWT 토큰 검증 및 검증된 요청자 API 접근 허용)
+	v1 := e.Group("/api/v1", middlewares.CheckToken(conn))
 	v1.GET("/users", apiUser.GetUsers)
-
-	// 아이디 및 비밀번호 확인(BasicAuth)시 JWT 토큰 발급 및 Redis 저장
-
-	// userMiddleware 설정 (입력된 JWT 토큰 검증 및 검증된 요청자 API 접근 허용)
 
 	return e
 }
