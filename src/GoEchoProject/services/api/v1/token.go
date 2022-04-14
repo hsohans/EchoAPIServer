@@ -11,6 +11,7 @@ import (
 	"github.com/twinj/uuid"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -25,6 +26,77 @@ func GetTokenService(DbInfo *gorm.DB, RedisInfo *redis.Client) *TokenService {
 		DbInfo:    DbInfo,
 		RedisInfo: RedisInfo,
 	}
+}
+
+// 1. 토큰 추출
+func ExtractToken(c echo.Context) (string, error) {
+	var err error
+	req := c.Request()
+	bearToken := req.Header.Get("Authorization")
+	//normally Authorization the_token_xxx
+	strArr := strings.Split(bearToken, " ")
+
+	if len(strArr) == 2 {
+		// Bearer 제외
+		return strArr[1], err
+	} else if len(bearToken) == 0 || len(strArr) == 0 {
+		// Token 정보가 없으면
+		return "", fmt.Errorf("Please enter token")
+	}
+	return bearToken, err
+}
+
+// 2. 토큰 검증 (signing method 검증, 서명 검증)
+func VerifyToken(bearToken string, c echo.Context) (*jwt.Token, error) {
+	token, err := jwt.Parse(bearToken, func(token *jwt.Token) (interface{}, error) {
+		//Make sure that the token method conform to "SigningMethodHMAC"
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(os.Getenv("ACCESS_SECRET")), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return token, nil
+}
+
+// 3. 토큰 만료 검증
+func TokenValid(token *jwt.Token) error {
+	if _, ok := token.Claims.(jwt.Claims); !ok && !token.Valid {
+		return fmt.Errorf("Invaild token")
+	}
+	return nil
+}
+
+// 4. 메타 데이터 추출 (메타데이터 이용한 Redis 확인)
+func ExtractTokenMetadata(token *jwt.Token) (map[string]interface{}, error) {
+	// metadata 초기화 선언
+	metadata := make(map[string]interface{})
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if ok && token.Valid {
+		accessUuid, ok := claims["access_uuid"].(string)
+		if !ok {
+			return metadata, fmt.Errorf("No access_uuid in metadata")
+		}
+		userId, ok := claims["user_id"].(string)
+		if !ok {
+			return metadata, fmt.Errorf("No user_id in metadata")
+		}
+		metadata["access_uuid"] = accessUuid
+		metadata["user_id"] = userId
+		return metadata, nil
+	}
+	return metadata, fmt.Errorf("Token is invalid")
+}
+
+// 5. Redis 추출 (UUID를 이용한 userId 추출)
+func FetchAuth(metadata map[string]interface{}, RedisInfo *redis.Client) (string, error) {
+	userid, err := RedisInfo.Get(metadata["access_uuid"].(string)).Result()
+	if err != nil {
+		return "", fmt.Errorf("User is not exist")
+	}
+	return userid, nil
 }
 
 func (h *TokenService) CreateToken(apiRequest models.UserInfo, c echo.Context) (models.TokenDetails, error) {
