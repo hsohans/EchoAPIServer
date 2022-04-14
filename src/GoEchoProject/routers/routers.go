@@ -32,12 +32,13 @@ func SetupRouter(conn connections.Connections) *echo.Echo {
 	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	// Controller 설정
-	apiAuthentication := apiControllerV1.GetAuthenticationController(conn)
+	apiToken := apiControllerV1.GetTokenController(conn)
 	apiUser := apiControllerV1.GetUserController(conn)
 
 	// Router 설정
 	//// Token은 항상 접근 가능하도록
-	e.POST("/api/v1/token", apiAuthentication.CreateToken)
+	e.POST("/api/v1/token", apiToken.CreateToken)
+	e.POST("/api/v1/refreshtoken", apiToken.RefreshToken)
 
 	//// 그외에 다른 정보는 발급된 토큰을 기반으로 유효한 토큰을 가진 사용자만 접근하도록 middleware 설정
 	//// 추가 설명 : middlewares.CheckToken 설정 (입력된 JWT 토큰 검증 및 검증된 요청자 API 접근 허용)

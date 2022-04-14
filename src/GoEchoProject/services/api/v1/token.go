@@ -15,19 +15,19 @@ import (
 )
 
 //Gorm Object Struct
-type AuthenticationService struct {
+type TokenService struct {
 	DbInfo    *gorm.DB
 	RedisInfo *redis.Client
 }
 
-func GetAuthenticationService(DbInfo *gorm.DB, RedisInfo *redis.Client) *AuthenticationService {
-	return &AuthenticationService{
+func GetTokenService(DbInfo *gorm.DB, RedisInfo *redis.Client) *TokenService {
+	return &TokenService{
 		DbInfo:    DbInfo,
 		RedisInfo: RedisInfo,
 	}
 }
 
-func (h *AuthenticationService) CreateToken(apiRequest models.UserInfo, c echo.Context) (models.TokenDetails, error) {
+func (h *TokenService) CreateToken(apiRequest models.UserInfo, c echo.Context) (models.TokenDetails, error) {
 	// 아이디 및 비밀번호 확인 시 JWT 토큰 발급 및 Redis 저장
 
 	// Token 모델을 선언한다.
@@ -92,5 +92,13 @@ func (h *AuthenticationService) CreateToken(apiRequest models.UserInfo, c echo.C
 	if errRefresh != nil {
 		return td, errRefresh
 	}
+	return td, nil
+}
+
+func (h *TokenService) RefreshToken(apiRequest models.TokenDetails, c echo.Context) (models.TokenDetails, error) {
+	// RefreshToken 확인 시 기존 JWT 토큰 정보 삭제 및 생성 후 Redis 저장
+
+	// Token 모델을 선언한다.
+	td := models.TokenDetails{}
 	return td, nil
 }
