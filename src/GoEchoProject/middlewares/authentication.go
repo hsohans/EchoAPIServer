@@ -19,7 +19,7 @@ func CheckToken(conn connections.Connections) echo.MiddlewareFunc {
 			}
 
 			// 2. 토큰 검증 (signing method 검증, 서명 검증)
-			token, err := v1service.VerifyToken(bearToken, c)
+			token, err := v1service.VerifyToken(bearToken, "ACCESS_SECRET", c)
 			if err != nil {
 				return echo.NewHTTPError(http.StatusUnauthorized, err.Error())
 			}
@@ -31,7 +31,7 @@ func CheckToken(conn connections.Connections) echo.MiddlewareFunc {
 			}
 
 			// 4. 메타 데이터 추출 (메타데이터 이용한 Redis 확인)
-			metadata, err := v1service.ExtractTokenMetadata(token)
+			metadata, err := v1service.ExtractTokenMetadata(token, "ACCESS")
 			if err != nil {
 				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 			}

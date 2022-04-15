@@ -1,10 +1,12 @@
 package models
 
-type TokenDetails struct {
-	AccessToken  string
-	RefreshToken string
-	AccessUuid   string
-	RefreshUuid  string
-	AtExpires    int64
-	RtExpires    int64
-}
+type (
+	TokenDetails struct {
+		AccessToken  string `json:"accessToken"`
+		RefreshToken string `json:"refreshToken"`
+		AccessUuid   string `json:"accessUuid"`
+		RefreshUuid  string `json:"refreshUuid"`
+		AtExpires    int64  `json:"atExpires"`
+		RtExpires    int64  `json:"rtExpires"`
+	}
+)

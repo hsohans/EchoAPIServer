@@ -9,8 +9,8 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/labstack/echo/v4"
 	"github.com/twinj/uuid"
+	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -47,13 +47,13 @@ func ExtractToken(c echo.Context) (string, error) {
 }
 
 // 2. 토큰 검증 (signing method 검증, 서명 검증)
-func VerifyToken(bearToken string, c echo.Context) (*jwt.Token, error) {
+func VerifyToken(bearToken string, secretType string, c echo.Context) (*jwt.Token, error) {
 	token, err := jwt.Parse(bearToken, func(token *jwt.Token) (interface{}, error) {
 		//Make sure that the token method conform to "SigningMethodHMAC"
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte(os.Getenv("ACCESS_SECRET")), nil
+		return []byte(os.Getenv(secretType)), nil
 	})
 	if err != nil {
 		return nil, err
@@ -70,22 +70,38 @@ func TokenValid(token *jwt.Token) error {
 }
 
 // 4. 메타 데이터 추출 (메타데이터 이용한 Redis 확인)
-func ExtractTokenMetadata(token *jwt.Token) (map[string]interface{}, error) {
+func ExtractTokenMetadata(token *jwt.Token, tokenType string) (map[string]interface{}, error) {
 	// metadata 초기화 선언
 	metadata := make(map[string]interface{})
 	claims, ok := token.Claims.(jwt.MapClaims)
+
 	if ok && token.Valid {
-		accessUuid, ok := claims["access_uuid"].(string)
-		if !ok {
-			return metadata, fmt.Errorf("No access_uuid in metadata")
+		switch tokenType {
+		case "ACCESS":
+			accessUuid, ok := claims["access_uuid"].(string)
+			if !ok {
+				return metadata, fmt.Errorf("No access_uuid in metadata")
+			}
+			userId, ok := claims["user_id"].(string)
+			if !ok {
+				return metadata, fmt.Errorf("No user_id in metadata")
+			}
+			metadata["access_uuid"] = accessUuid
+			metadata["user_id"] = userId
+			return metadata, nil
+		case "REFRESH":
+			refreshUuid, ok := claims["refresh_uuid"].(string)
+			if !ok {
+				return metadata, fmt.Errorf("No refresh_uuid in metadata")
+			}
+			userId, ok := claims["user_id"].(string)
+			if !ok {
+				return metadata, fmt.Errorf("No user_id in metadata")
+			}
+			metadata["refresh_uuid"] = refreshUuid
+			metadata["user_id"] = userId
+			return metadata, nil
 		}
-		userId, ok := claims["user_id"].(string)
-		if !ok {
-			return metadata, fmt.Errorf("No user_id in metadata")
-		}
-		metadata["access_uuid"] = accessUuid
-		metadata["user_id"] = userId
-		return metadata, nil
 	}
 	return metadata, fmt.Errorf("Token is invalid")
 }
@@ -99,6 +115,71 @@ func FetchAuth(metadata map[string]interface{}, RedisInfo *redis.Client) (string
 	return userid, nil
 }
 
+// redis Token 데이터 삭제
+func DeleteAuth(givenUuid string, RedisInfo *redis.Client) (int64, error) {
+	deleted, err := RedisInfo.Del(givenUuid).Result()
+	if err != nil {
+		return 0, err
+	}
+	return deleted, nil
+}
+
+// Token 데이터 생성
+func CreateToken(td models.TokenDetails, user_id string) (models.TokenDetails, error) {
+	var err error
+
+	// Access Token 만료 시간 (현재시간 + 15분)
+	td.AtExpires = time.Now().Add(time.Minute * 15).Unix()
+	td.AccessUuid = uuid.NewV4().String()
+	// Refresh Token 만료 시간 (현재시간 + 7일)
+	td.RtExpires = time.Now().Add(time.Hour * 24 * 7).Unix()
+	td.RefreshUuid = uuid.NewV4().String()
+
+	//Creating Access Token
+	os.Setenv("ACCESS_SECRET", "jdnfksdmfksd")
+	atClaims := jwt.MapClaims{}
+	atClaims["authorized"] = true
+	atClaims["access_uuid"] = td.AccessUuid
+	atClaims["user_id"] = user_id
+	atClaims["exp"] = td.AtExpires
+	at := jwt.NewWithClaims(jwt.SigningMethodHS256, atClaims)
+	td.AccessToken, err = at.SignedString([]byte(os.Getenv("ACCESS_SECRET")))
+
+	os.Setenv("REFRESH_SECRET", "mcmvmkmsdnfsdmfdsjf") //this should be in an env file
+	rtClaims := jwt.MapClaims{}
+	rtClaims["refresh_uuid"] = td.RefreshUuid
+	rtClaims["user_id"] = user_id
+	rtClaims["exp"] = td.RtExpires
+	rt := jwt.NewWithClaims(jwt.SigningMethodHS256, rtClaims)
+	td.RefreshToken, err = rt.SignedString([]byte(os.Getenv("REFRESH_SECRET")))
+
+	if err != nil {
+		return td, err
+	}
+	return td, nil
+}
+
+// Token 데이터 Redis 저장
+func CreateAuth(td models.TokenDetails, user_id string, RedisInfo *redis.Client) (models.TokenDetails, error) {
+	// at는 AccessToken의 접근 유효 시간
+	// rt는 RefreshToken의 만료 시간
+	redis_at := time.Unix(td.AtExpires, 0) //converting Unix to UTC
+	redis_rt := time.Unix(td.RtExpires, 0)
+	now := time.Now()
+
+	// JWT을 Redis에 저장한다.
+	errAccess := RedisInfo.Set(td.AccessUuid, user_id, redis_at.Sub(now)).Err()
+	if errAccess != nil {
+		return td, errAccess
+	}
+	errRefresh := RedisInfo.Set(td.RefreshUuid, user_id, redis_rt.Sub(now)).Err()
+	if errRefresh != nil {
+		return td, errRefresh
+	}
+	return td, nil
+}
+
+// Refresh 토큰 정리 후 적용
 func (h *TokenService) CreateToken(apiRequest models.UserInfo, c echo.Context) (models.TokenDetails, error) {
 	// 아이디 및 비밀번호 확인 시 JWT 토큰 발급 및 Redis 저장
 
@@ -133,8 +214,7 @@ func (h *TokenService) CreateToken(apiRequest models.UserInfo, c echo.Context) (
 	atClaims["user_id"] = apiRequest.Username
 	atClaims["exp"] = time.Now().Add(time.Minute * 15).Unix()
 	at := jwt.NewWithClaims(jwt.SigningMethodHS256, atClaims)
-	token, err := at.SignedString([]byte(os.Getenv("ACCESS_SECRET")))
-	td.AccessToken = token
+	td.AccessToken, err = at.SignedString([]byte(os.Getenv("ACCESS_SECRET")))
 
 	// Refresh Token을 생성한다.
 	os.Setenv("REFRESH_SECRET", "mcmvmkmsdnfsdmfdsjf") //this should be in an env file
@@ -156,11 +236,11 @@ func (h *TokenService) CreateToken(apiRequest models.UserInfo, c echo.Context) (
 
 	// Todo Redis 생성시 value 처리
 	// JWT을 Redis에 저장한다.
-	errAccess := h.RedisInfo.Set(td.AccessUuid, strconv.Itoa(int(1)), redis_at.Sub(now)).Err()
+	errAccess := h.RedisInfo.Set(td.AccessUuid, apiRequest.Username, redis_at.Sub(now)).Err()
 	if errAccess != nil {
 		return td, errAccess
 	}
-	errRefresh := h.RedisInfo.Set(td.RefreshUuid, strconv.Itoa(int(1)), redis_rt.Sub(now)).Err()
+	errRefresh := h.RedisInfo.Set(td.RefreshUuid, apiRequest.Username, redis_rt.Sub(now)).Err()
 	if errRefresh != nil {
 		return td, errRefresh
 	}
@@ -172,5 +252,45 @@ func (h *TokenService) RefreshToken(apiRequest models.TokenDetails, c echo.Conte
 
 	// Token 모델을 선언한다.
 	td := models.TokenDetails{}
+
+	// 2. 토큰 검증 (signing method 검증, 서명 검증)
+	token, err := VerifyToken(apiRequest.RefreshToken, "REFRESH_SECRET", c)
+	if err != nil {
+		return td, echo.NewHTTPError(http.StatusUnauthorized, err.Error())
+	}
+
+	// 3. 토큰 만료 검증 (동작 방식 확인 필요)
+	err = TokenValid(token)
+	if err != nil {
+		return td, echo.NewHTTPError(http.StatusUnauthorized, err.Error())
+	}
+
+	// 4. 메타 데이터 추출 (메타데이터 이용한 Redis 확인)
+	metadata, err := ExtractTokenMetadata(token, "REFRESH")
+	if err != nil {
+		return td, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	fmt.Println(metadata)
+
+	// 5. Redis Token 삭제
+	//Delete the previous Refresh Token
+	deleted, delErr := DeleteAuth(metadata["refresh_uuid"].(string), h.RedisInfo)
+	if delErr != nil || deleted == 0 {
+		c.JSON(http.StatusUnauthorized, "unauthorized")
+		return td, err
+	}
+
+	// 6. Redis 토큰 생성
+	td, err = CreateToken(td, metadata["user_id"].(string))
+	if err != nil {
+		return td, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	// 7. Token 데이터 저장
+	td, err = CreateAuth(td, metadata["user_id"].(string), h.RedisInfo)
+	if err != nil {
+		return td, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
 	return td, nil
 }

@@ -24,7 +24,7 @@ func GetTokenController(conn connections.Connections) *TokenController {
 
 func (a *TokenController) CreateToken(c echo.Context) (err error) {
 
-	/* Request Body Data를 매핑한다.  */
+	/* Request Body Data를 매핑한다. */
 	var apiRequest models.UserInfo // -> &추가
 	if err = c.Bind(&apiRequest); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid json provided")
